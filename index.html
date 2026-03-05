@@ -325,7 +325,6 @@
         selecoesTemporarias[id] = btn.innerText;
     }
 
-    // FUNÇÃO ATUALIZADA COM VERIFICAÇÃO DE ESTOQUE
     function adicionarAoCarrinho(id) {
         const p = produtosData.find(x => x.id === id);
         const t = selecoesTemporarias[id];
@@ -381,7 +380,6 @@
         document.getElementById('cart-total-value').innerText = `R$ ${totalF.toFixed(2)}`;
     }
 
-    // FUNÇÃO ATUALIZADA COM VERIFICAÇÃO DE ESTOQUE NO BOTÃO +
     function alterarQtd(i, d) { 
         const item = carrinho[i];
         const pOriginal = produtosData.find(x => x.id === item.id);
@@ -410,25 +408,68 @@
     
     setInterval(() => moveSlide(1), 5000);
 
+    // FUNÇÃO ATUALIZADA COM BAIXA DE ESTOQUE AUTOMÁTICA
     async function enviarWhatsApp() {
         if (!carrinho.length) return;
+
+        const btnFinalizar = document.getElementById('btn-finalizar');
         const entrega = document.getElementById('forma-entrega').value;
         const cep = document.getElementById('cep-destino').value;
-        if (entrega === 'frete' && !cep) { alert("Informe o CEP!"); return; }
-        
-        let qtdT = carrinho.reduce((s, i) => s + i.qtd, 0);
-        let eAtacado = qtdT >= 4, totalF = 0;
-        let msg = `🚀 *PEDIDO BRAZUKA 1.1*\n\n`;
-        carrinho.forEach(i => {
-            let p = eAtacado ? i.precoAtacado : i.precoVarejo;
-            totalF += p * i.qtd;
-            msg += `✅ ${i.qtd}x ${i.nome} (${i.tamanho}) - R$ ${p.toFixed(2)}\n`;
-        });
-        msg += `\n📦 *Entrega:* ${entrega === 'retirar' ? 'Retirar no Local' : 'Enviar por Frete (CEP: '+cep+')'}`;
-        msg += `\n💰 *Total: R$ ${totalF.toFixed(2)}*`;
-        msg += `\n\n💳 *Pagamento via:* ( ) Pix  ( ) Cartão de Crédito`;
-        
-        window.open(`https://wa.me/5521986285970?text=${encodeURIComponent(msg)}`);
+
+        if (entrega === 'frete' && !cep) { 
+            alert("Informe o CEP!"); 
+            return; 
+        }
+
+        // 1. Feedback visual no botão
+        btnFinalizar.disabled = true;
+        const textoOriginal = btnFinalizar.innerHTML;
+        btnFinalizar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando Estoque...';
+
+        try {
+            // 2. Prepara dados para o Google Sheets
+            const itensParaBaixa = carrinho.map(item => ({
+                id: item.id,
+                tamanho: item.tamanho,
+                qtd: item.qtd
+            }));
+
+            // 3. Envia para o Apps Script (Baixa no estoque)
+            await fetch(URL_SCRIPT_ESTOQUE, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(itensParaBaixa)
+            });
+
+            // 4. Monta a mensagem do WhatsApp
+            let qtdT = carrinho.reduce((s, i) => s + i.qtd, 0);
+            let eAtacado = qtdT >= 4, totalF = 0;
+            let msg = `🚀 *PEDIDO BRAZUKA 1.1*\n\n`;
+            
+            carrinho.forEach(i => {
+                let p = eAtacado ? i.precoAtacado : i.precoVarejo;
+                totalF += p * i.qtd;
+                msg += `✅ ${i.qtd}x ${i.nome} (${i.tamanho}) - R$ ${p.toFixed(2)}\n`;
+            });
+            
+            msg += `\n📦 *Entrega:* ${entrega === 'retirar' ? 'Retirar no Local' : 'Enviar por Frete (CEP: '+cep+')'}`;
+            msg += `\n💰 *Total: R$ ${totalF.toFixed(2)}*`;
+            msg += `\n\n💳 *Pagamento via:* ( ) Pix  ( ) Cartão de Crédito`;
+
+            // 5. Abre o WhatsApp
+            window.open(`https://wa.me/5521986285970?text=${encodeURIComponent(msg)}`);
+
+            // 6. Alerta de sucesso e recarrega a página para atualizar o estoque visualmente
+            alert("Pedido processado! Atualizando estoque do site...");
+            location.reload(); 
+
+        } catch (error) {
+            console.error("Erro:", error);
+            alert("Houve um erro ao atualizar o estoque, mas você pode finalizar pelo WhatsApp.");
+            btnFinalizar.disabled = false;
+            btnFinalizar.innerHTML = textoOriginal;
+        }
     }
 
     carregarProdutos();
