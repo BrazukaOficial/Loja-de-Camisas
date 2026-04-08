@@ -143,12 +143,21 @@
             <div id="cart-items-list" class="flex-1 overflow-y-auto p-4 space-y-6"></div>
             
             <div class="p-4 bg-gray-100 border-t border-b space-y-3">
-                <div>
-                    <label class="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Como deseja receber?</label>
-                    <select id="forma-entrega" class="select-input" onchange="toggleCepInput()">
-                        <option value="frete">Enviar para meu endereço</option>
-                        <option value="retirar">Retirar no local</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Recebimento:</label>
+                        <select id="forma-entrega" class="select-input" onchange="toggleCepInput()">
+                            <option value="frete">Correios / Envios</option>
+                            <option value="retirar">Retirar Local</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Pagamento:</label>
+                        <select id="forma-pagamento" class="select-input">
+                            <option value="Pix">Pix (Melhor Preço)</option>
+                            <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="campo-cep">
                     <label class="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Seu CEP:</label>
@@ -221,7 +230,6 @@
         o.style.display = m.classList.contains('active') ? 'block' : 'none';
     }
 
-    // NOVAS FUNÇÕES DA POLÍTICA
     function togglePolitica() {
         document.getElementById('modal-politica').classList.toggle('active');
     }
@@ -423,26 +431,33 @@
     async function enviarWhatsApp() {
         if (!carrinho.length) return;
         const entrega = document.getElementById('forma-entrega').value;
+        const pagamento = document.getElementById('forma-pagamento').value;
         const cep = document.getElementById('cep-destino').value;
+        
         if (entrega === 'frete' && !cep) { alert("Informe o CEP!"); return; }
+        
         const btn = document.getElementById('btn-finalizar');
         btn.innerText = "PROCESSANDO...";
         btn.disabled = true;
+        
         try {
             const dadosVenda = { itens: carrinho.map(i => ({ id: i.id, tamanho: i.tamanho, qtd: i.qtd })) };
             await fetch(URL_SCRIPT_ESTOQUE, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(dadosVenda) });
         } catch (e) { console.error(e); }
+        
         let qtdT = carrinho.reduce((s, i) => s + i.qtd, 0);
         let eAtacado = qtdT >= 4, totalF = 0;
         let msg = `🚀 *PEDIDO BRAZUKA 1.1*\n\n`;
+        
         carrinho.forEach(i => {
             let p = eAtacado ? i.precoAtacado : i.precoVarejo;
             totalF += p * i.qtd;
             msg += `✅ ${i.qtd}x ${i.nome} (${i.tamanho}) - R$ ${p.toFixed(2)}\n`;
         });
+        
         msg += `\n📦 *Entrega:* ${entrega === 'retirar' ? 'Retirar no Local' : 'Enviar por Frete (CEP: '+cep+')'}`;
         msg += `\n💰 *Total: R$ ${totalF.toFixed(2)}*`;
-        msg += `\n\n💳 *Pagamento via:* ( ) Pix  ( ) Cartão de Crédito`;
+        msg += `\n💳 *Pagamento:* ${pagamento}`;
         msg += `\n\n_Pode gerar meu link de pagamento, por favor?_`;
         
         window.open(`https://wa.me/5521986499755?text=${encodeURIComponent(msg)}`);
